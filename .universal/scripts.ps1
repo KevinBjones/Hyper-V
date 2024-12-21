@@ -1,0 +1,1 @@
+﻿New-PSUScript -Name "Hello World.ps1" -Description "Hello World.ps1" -Path "Hello World.ps1"
