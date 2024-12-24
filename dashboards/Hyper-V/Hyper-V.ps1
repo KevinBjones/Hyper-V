@@ -49,7 +49,12 @@
     @{
         Name       = 'Toggle'
         Expression = { $_.Name }
+    },
+    @{
+        Name       = 'Restart'
+        Expression = { $_.Name }
     }
+    
 }
 
 
@@ -76,7 +81,7 @@ New-UDApp -Title "Hyper-V Manager" -Content {
                 New-UDTableColumn -Property "MemoryUsage"        -Title "Average Memory Usage"
                 New-UDTableColumn -Property "AverageCPUUsageMHz" -Title "Average CPU Usage (MHz)"
                 New-UDTableColumn -Property "IPAddress"          -Title "IP Address"
-                New-UDTableColumn -Property "Toggle"             -Title "Toggle Power" -Render {
+                New-UDTableColumn -Property "Power"              -Title "Toggle Power" -Render {
                     New-UDIconButton -Icon (New-UDIcon -Icon "PowerOff") -OnClick {
                         if ((Get-VM -Name $EventData.Name).State -eq 'Running') {
                             Stop-VM -Name $EventData.Name
@@ -86,6 +91,19 @@ New-UDApp -Title "Hyper-V Manager" -Content {
                             Start-VM -Name $EventData.Name
                             Show-UDToast -Message "Started $($EventData.Name)"
                         }
+                        Sync-UDElement -Id "vmTable"
+                    }
+                }
+                New-UDTableColumn -Property "Restart"              -Title "Restart" -Render {
+                    New-UDIconButton -Icon (New-UDIcon -Icon "Sync") -OnClick {
+                        if ((Get-VM -Name $EventData.Name).State -eq 'Running') {
+                            Restart-VM -Name $EventData.Name
+                            Show-UDToast -Message "Restarted $($EventData.Name)"
+                        }
+                        else {
+                            Show-UDToast -Message "$($EventData.Name) is not running. Cannot restart."
+                        }
+                        Sync-UDElement -Id "vmTable"
                     }
                 }
 
