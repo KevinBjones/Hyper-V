@@ -1,4 +1,8 @@
-﻿function Get-MyVMs {
+﻿#----------------------------------------------------------------------------------
+# Get vm function
+#----------------------------------------------------------------------------------
+
+function Get-MyVMs {
     Get-VM |
     Select-Object -Property Name, State, @{
         Name       = 'Uptime'
@@ -16,7 +20,7 @@
         Expression = {
             if ($_.State -eq 'Running') {
                 $memoryAssigned = [math]::Round($_.MemoryAssigned / 1MB, 2)
-                $memoryDemand = [math]::Round($_.MemoryDemand / 1MB, 2)
+                $memoryDemand   = [math]::Round($_.MemoryDemand / 1MB, 2)
                 "$memoryDemand MB / $memoryAssigned MB"
             }
             else {
@@ -53,17 +57,44 @@
     @{
         Name       = 'Restart'
         Expression = { $_.Name }
+    },
+    @{
+        Name       = 'Monitor'
+        Expression = { $_.Name }
     }
-    
 }
+
 
 $isoFiles = Get-ChildItem -Path 'C:\Hyper-V\ISO' -Filter '*.iso' -File |
 Select-Object -ExpandProperty Name
 
-New-UDApp -Title "Hyper-V Manager" -Content {
+#----------------------------------------------------------------------------------
+# Monitor Page
+#----------------------------------------------------------------------------------
+
+$MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
+
+    New-UDTypography -Text "Monitor Page for VM: $vmName" -Variant "h4"
+    
+    $vm = Get-VM -Name $vmName 
+    if ($vm) {
+        New-UDTypography -Text "VM State: $($vm.State)"
+    } else {
+        New-UDTypography -Text "VM '$vmName' was not found."
+    }
+
+    New-UDButton -Text "Home" -OnClick {
+        Invoke-UDRedirect -Url "/"
+    }
+}
+
+#----------------------------------------------------------------------------------
+#Home page
+#----------------------------------------------------------------------------------
+
+$HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
     New-UDTypography -Text "Hyper-V Manager" -Variant "h4"
-
    
     New-UDRow -Columns {
         New-UDColumn -Content {
@@ -73,7 +104,6 @@ New-UDApp -Title "Hyper-V Manager" -Content {
         }
         New-UDColumn -Content {
             New-UDButton -Text "Create VM" -OnClick {
-                #TODO: attach iso to vm on creation
                 Show-UDModal -Content {
                     New-UDTypography -Text "Create New VM" -Variant "h5"
                     New-UDForm -Content {
@@ -89,17 +119,23 @@ New-UDApp -Title "Hyper-V Manager" -Content {
                         $vmName = (Get-UDElement -Id "vmName").Value
                         $memorySize = [int](Get-UDElement -Id "memorySize").Value
                         $diskSize = [int](Get-UDElement -Id "diskSize").Value
+                        $selectedISO = (Get-UDElement -Id "isoSelect").Value
 
                         New-VM -Name $vmName `
-                            -MemoryStartupBytes ($memorySize * 1MB) `
-                            -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
-                            -NewVHDSizeBytes ($diskSize * 1GB)
-                
+                               -MemoryStartupBytes ($memorySize * 1MB) `
+                               -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
+                               -NewVHDSizeBytes ($diskSize * 1GB)
+
                         Enable-VMResourceMetering -VMName $vmName
+                        Set-VMDvdDrive -VMName $vmName -Path "C:\Hyper-V\ISO\$selectedISO"
 
                         Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
                         try {
-                            New-VM -Name $vmName -MemoryStartupBytes ($memorySize * 1MB) -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" -NewVHDSizeBytes ($diskSize * 1GB)
+                            New-VM -Name $vmName `
+                                   -MemoryStartupBytes ($memorySize * 1MB) `
+                                   -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
+                                   -NewVHDSizeBytes ($diskSize * 1GB)
+
                             Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
                         }
                         catch {
@@ -115,7 +151,9 @@ New-UDApp -Title "Hyper-V Manager" -Content {
             }
         }
     }
-
+#----------------------------------------------------------------------------------
+#VM Tabel
+#----------------------------------------------------------------------------------
 
     New-UDDynamic -Id "vmTable" -Content {
         
@@ -145,6 +183,7 @@ New-UDApp -Title "Hyper-V Manager" -Content {
                         Sync-UDElement -Id "vmTable"
                     }
                 }
+
                 New-UDTableColumn -Property "Restart"              -Title "Restart" -Render {
                     New-UDIconButton -Icon (New-UDIcon -Icon "Sync") -OnClick {
                         if ((Get-VM -Name $EventData.Name).State -eq 'Running') {
@@ -158,8 +197,23 @@ New-UDApp -Title "Hyper-V Manager" -Content {
                     }
                 }
 
+                New-UDTableColumn -Property "Monitoring"              -Title "Monitoring Data" -Render {
+                    New-UDButton -Icon(New-UDIcon -Icon "Heartbeat") -OnClick {
+                        $vmName = $EventData.Name
+                        Invoke-UDRedirect -Url "/monitor/$($vmName)"
+                    }
+                }
             )
         }
     } -AutoRefresh -AutoRefreshInterval 10
+
 }
 
+#----------------------------------------------------------------------------------
+#App creation
+#----------------------------------------------------------------------------------
+
+New-UDApp -Title "Hyper-V Manager" -Pages @(
+    $HomePage,
+    $MonitorPage
+)
