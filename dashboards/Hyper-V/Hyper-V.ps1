@@ -57,14 +57,65 @@
     
 }
 
+$isoFiles = Get-ChildItem -Path 'C:\Hyper-V\ISO' -Filter '*.iso' -File |
+Select-Object -ExpandProperty Name
 
 New-UDApp -Title "Hyper-V Manager" -Content {
 
     New-UDTypography -Text "Hyper-V Manager" -Variant "h4"
 
-    New-UDButton -Text "Refresh" -OnClick {
-        Sync-UDElement -Id "vmTable"
+   
+    New-UDRow -Columns {
+        New-UDColumn -Content {
+            New-UDButton -Text "Refresh" -OnClick {
+                Sync-UDElement -Id "vmTable"
+            }
+        }
+        New-UDColumn -Content {
+            New-UDButton -Text "Create VM" -OnClick {
+                #TODO: attach iso to vm on creation
+                Show-UDModal -Content {
+                    New-UDTypography -Text "Create New VM" -Variant "h5"
+                    New-UDForm -Content {
+                        New-UDTextbox -Id "vmName" -Label "VM Name" 
+                        New-UDTextbox -Id "memorySize" -Label "Memory Size (MB)" 
+                        New-UDTextbox -Id "diskSize" -Label "Disk Size (GB)" 
+                        New-UDSelect -Id "isoSelect" -Label "Select an ISO" -Option {
+                            foreach ($iso in $isoFiles) {
+                                New-UDSelectOption -Name $iso -Value $iso
+                            }
+                        }
+                    } -OnSubmit {
+                        $vmName = (Get-UDElement -Id "vmName").Value
+                        $memorySize = [int](Get-UDElement -Id "memorySize").Value
+                        $diskSize = [int](Get-UDElement -Id "diskSize").Value
+
+                        New-VM -Name $vmName `
+                            -MemoryStartupBytes ($memorySize * 1MB) `
+                            -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
+                            -NewVHDSizeBytes ($diskSize * 1GB)
+                
+                        Enable-VMResourceMetering -VMName $vmName
+
+                        Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
+                        try {
+                            New-VM -Name $vmName -MemoryStartupBytes ($memorySize * 1MB) -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" -NewVHDSizeBytes ($diskSize * 1GB)
+                            Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
+                        }
+                        catch {
+                            Show-UDToast -Message "Error creating VM: $_" -Duration 5000 
+                        }
+
+                        Sync-UDElement -Id "vmTable"
+                        Hide-UDModal
+                    }
+                } -Footer {
+                    New-UDButton -Text "Close" -OnClick { Hide-UDModal }
+                }
+            }
+        }
     }
+
 
     New-UDDynamic -Id "vmTable" -Content {
         
@@ -109,6 +160,6 @@ New-UDApp -Title "Hyper-V Manager" -Content {
 
             )
         }
-    }
+    } -AutoRefresh -AutoRefreshInterval 10
 }
 
