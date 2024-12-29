@@ -3,7 +3,17 @@
 #----------------------------------------------------------------------------------
 
 function Get-MyVMs {
-    Get-VM |
+    param(
+        [string]$Name
+    )
+
+    $vms = Get-VM
+
+    if ($Name) {
+        $vms = $vms | Where-Object { $_.Name -eq $Name }
+    }
+
+    $vms |
     Select-Object -Property Name, State, @{
         Name       = 'Uptime'
         Expression = {
@@ -20,7 +30,7 @@ function Get-MyVMs {
         Expression = {
             if ($_.State -eq 'Running') {
                 $memoryAssigned = [math]::Round($_.MemoryAssigned / 1MB, 2)
-                $memoryDemand   = [math]::Round($_.MemoryDemand / 1MB, 2)
+                $memoryDemand = [math]::Round($_.MemoryDemand / 1MB, 2)
                 "$memoryDemand MB / $memoryAssigned MB"
             }
             else {
@@ -28,6 +38,28 @@ function Get-MyVMs {
             }
         }
     }, @{
+        Name       = 'MemoryAssigned'
+        Expression = {
+            if ($_.State -eq 'Running') {
+                [math]::Round($_.MemoryAssigned / 1MB, 2)
+            }
+            else {
+                'N/A'
+            }
+        }
+    },
+    @{
+        Name       = 'MemoryUsed'
+        Expression = {
+            if ($_.State -eq 'Running') {
+                [math]::Round($_.MemoryDemand / 1MB, 2)
+            }
+            else {
+                'N/A'
+            }
+        }
+    },
+    @{
         Name       = 'AverageCPUUsageMHz'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -49,20 +81,18 @@ function Get-MyVMs {
                 'N/A'
             }
         }
-    }, 
-    @{
+    }, @{
         Name       = 'Toggle'
         Expression = { $_.Name }
-    },
-    @{
+    }, @{
         Name       = 'Restart'
         Expression = { $_.Name }
-    },
-    @{
+    }, @{
         Name       = 'Monitor'
         Expression = { $_.Name }
     }
 }
+
 
 
 $isoFiles = Get-ChildItem -Path 'C:\Hyper-V\ISO' -Filter '*.iso' -File |
@@ -74,18 +104,37 @@ Select-Object -ExpandProperty Name
 
 $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
 
-    New-UDTypography -Text "Monitor Page for VM: $vmName" -Variant "h4"
-    
-    $vm = Get-VM -Name $vmName 
-    if ($vm) {
-        New-UDTypography -Text "VM State: $($vm.State)"
-    } else {
-        New-UDTypography -Text "VM '$vmName' was not found."
+    $vm = Get-MyVMs -Name $vmName
+
+    New-UDTypography -Text "All VM Data: $($vm)"
+
+    $memAssigned = $vm.MemoryAssigned
+    $memUsage = $vm.MemoryUsed
+    $memFree = $memAssigned - $memUsage
+
+    $chartData = @(
+        [PSCustomObject]@{ Label = 'Used Memory (MB)'; Value = $memUsage }
+        [PSCustomObject]@{ Label = 'Free Memory (MB)'; Value = $memFree }
+    )
+
+
+    $chartOptions = @{
+        aspectRatio = 0, 1
+        plugins     = @{
+            title = @{
+                display = $true
+                text    = "Assigned Memory: $memAssigned"
+            }
+        }
     }
 
-    New-UDButton -Text "Home" -OnClick {
-        Invoke-UDRedirect -Url "/"
+    New-UDRow -Columns {
+        New-UDColumn -LargeSize 6 -Content {
+            New-UDChartJS -Type 'pie' -Data $chartData -LabelProperty 'Label' -DataProperty 'Value' -Options $chartOptions -BackgroundColor @('rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)') -BorderColor @('rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)') -BorderWidth 1
+        }
     }
+
+
 }
 
 #----------------------------------------------------------------------------------
@@ -121,21 +170,17 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         $diskSize = [int](Get-UDElement -Id "diskSize").Value
                         $selectedISO = (Get-UDElement -Id "isoSelect").Value
 
-                        New-VM -Name $vmName `
-                               -MemoryStartupBytes ($memorySize * 1MB) `
-                               -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
-                               -NewVHDSizeBytes ($diskSize * 1GB)
-
-                        Enable-VMResourceMetering -VMName $vmName
-                        Set-VMDvdDrive -VMName $vmName -Path "C:\Hyper-V\ISO\$selectedISO"
+                        
+                        
 
                         Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
                         try {
                             New-VM -Name $vmName `
-                                   -MemoryStartupBytes ($memorySize * 1MB) `
-                                   -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
-                                   -NewVHDSizeBytes ($diskSize * 1GB)
-
+                                -MemoryStartupBytes ($memorySize * 1MB) `
+                                -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
+                                -NewVHDSizeBytes ($diskSize * 1GB)
+                            Set-VMDvdDrive -VMName $vmName -Path "C:\Hyper-V\ISO\$selectedISO"
+                            Enable-VMResourceMetering -VMName $vmName
                             Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
                         }
                         catch {
@@ -151,9 +196,10 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
             }
         }
     }
-#----------------------------------------------------------------------------------
-#VM Tabel
-#----------------------------------------------------------------------------------
+
+    #----------------------------------------------------------------------------------
+    #VM Tabel
+    #----------------------------------------------------------------------------------
 
     New-UDDynamic -Id "vmTable" -Content {
         
