@@ -1,5 +1,15 @@
-function Get-MyVMs {
-    Get-VM |
+﻿function Get-MyVMs {
+    param(
+        [string]$Name
+    )
+
+    $vms = Get-VM
+
+    if ($Name) {
+        $vms = $vms | Where-Object { $_.Name -eq $Name }
+    }
+
+    $vms |
     Select-Object -Property Name, State, @{
         Name       = 'Uptime'
         Expression = {
@@ -16,7 +26,7 @@ function Get-MyVMs {
         Expression = {
             if ($_.State -eq 'Running') {
                 $memoryAssigned = [math]::Round($_.MemoryAssigned / 1MB, 2)
-                $memoryDemand   = [math]::Round($_.MemoryDemand / 1MB, 2)
+                $memoryDemand = [math]::Round($_.MemoryDemand / 1MB, 2)
                 "$memoryDemand MB / $memoryAssigned MB"
             }
             else {
@@ -24,6 +34,28 @@ function Get-MyVMs {
             }
         }
     }, @{
+        Name       = 'MemoryAssigned'
+        Expression = {
+            if ($_.State -eq 'Running') {
+                [math]::Round($_.MemoryAssigned / 1MB, 2)
+            }
+            else {
+                'N/A'
+            }
+        }
+    },
+    @{
+        Name       = 'MemoryUsed'
+        Expression = {
+            if ($_.State -eq 'Running') {
+                [math]::Round($_.MemoryDemand / 1MB, 2)
+            }
+            else {
+                'N/A'
+            }
+        }
+    },
+    @{
         Name       = 'AverageCPUUsageMHz'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -45,16 +77,13 @@ function Get-MyVMs {
                 'N/A'
             }
         }
-    }, 
-    @{
+    }, @{
         Name       = 'Toggle'
         Expression = { $_.Name }
-    },
-    @{
+    }, @{
         Name       = 'Restart'
         Expression = { $_.Name }
-    },
-    @{
+    }, @{
         Name       = 'Monitor'
         Expression = { $_.Name }
     }

@@ -1,1 +1,1 @@
-﻿New-PSUScript -Name "Hello World.ps1" -Description "Hello World.ps1" -Path "Hello World.ps1"
+﻿New-PSUScript -Name "InfluxWrite.ps1" -Description "InfluxWrite.ps1" -Path "Scripts\InfluxWrite.ps1"

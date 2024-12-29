@@ -1,1 +1,1 @@
-﻿
+﻿New-PSUSchedule -Cron "*/5 * * * * *" -Script "Scripts\InfluxWrite.ps1" -TimeZone "Europe/Paris" -Name "InfluxWrite"
