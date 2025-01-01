@@ -10,28 +10,43 @@ Select-Object -ExpandProperty Name
 
 $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
 
-    $vm = Get-MyVMs -Name $vmName
-    $influxdata = InfluxFetch
-    $influxdata | Format-Table
 
+    #$vm = Get-MyVMs -Name $vmName
+    #$memAssigned = $vm.MemoryAssigned
+    #$memUsage = $vm.MemoryUsed
+    #$memFree = $memAssigned - $memUsage
 
+    $influxData = InfluxFetch
+    $parsedData = $influxData | ConvertFrom-Csv
+
+    $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
+    #New-UDTypography -Text "cpu data: $cpuData"
+    #New-UDTypography -Text "all data: $influxData"
+    $cpuChartData = $cpuData | ForEach-Object {
+        [PSCustomObject]@{
+            Time  = [datetime]$_._time
+            Value = [double]$_._value
+        }
+    }
+
+    $memoryData = $parsedData | Where-Object { $_._field -eq 'Memory_Used_MB' } | Sort-Object { [datetime]$_._time }
+    $memoryChartData = $memoryData | ForEach-Object {
+        [PSCustomObject]@{
+            Time  = [datetime]$_._time
+            Value = [double]$_._value
+        }
+    }
 
     
-    #New-UDTypography -Text "All VM Data: $($vm)"
-     New-UDTypography -Text "Host data: $($influxdata)"
-
-
-    $memAssigned = $vm.MemoryAssigned
-    $memUsage = $vm.MemoryUsed
-    $memFree = $memAssigned - $memUsage
-
+    <#
+ 
     $chartData = @(
         [PSCustomObject]@{ Label = 'Used Memory (MB)'; Value = $memUsage }
         [PSCustomObject]@{ Label = 'Free Memory (MB)'; Value = $memFree }
     )
 
 
-    $chartOptions = @{
+    $pieChartOptions = @{
         aspectRatio = 0, 1
         plugins     = @{
             title = @{
@@ -40,23 +55,92 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
             }
         }
     }
+        #>
+    $cpuChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Hypervisor CPU Usage'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
+        }
+        scales  = @{
+            x = @{
+                type  = 'time'
+                time  = @{
+                    unit = 'minute'
+                }
+                title = @{
+                    display = $true
+                    text    = 'Time'
+                }
+            }
+            y = @{
+                title = @{
+                    display = $true
+                    text    = 'Percentage CPU Used'
+                }
+            }
+        }
+    }
+        
+    $memoryChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Hypervisor Memory Usage'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
+        }
+        scales  = @{
+            x = @{
+                type  = 'time'
+                time  = @{
+                    unit = 'minute'
+                }
+                title = @{
+                    display = $true
+                    text    = 'Time'
+                }
+            }
+            y = @{
+                title = @{
+                    display = $true
+                    text    = 'MB'
+                }
+            }
+        }
+    }
+
 
     New-UDRow -Columns {
         New-UDColumn -LargeSize 6 -Content {
-            New-UDChartJS -Type 'pie' -Data $chartData -LabelProperty 'Label' -DataProperty 'Value' -Options $chartOptions -BackgroundColor @('rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)') -BorderColor @('rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)') -BorderWidth 1
+            New-UDChartJS -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
         }
-    }
-    New-UDRow -Columns {
         New-UDColumn -LargeSize 6 -Content {
-            New-UDChartJS -Type 'pie' -Data $chartData -LabelProperty 'Label' -DataProperty 'Value' -Options $chartOptions -BackgroundColor @('rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)') -BorderColor @('rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)') -BorderWidth 1
+            New-UDChartJS -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
         }
     }
 
+
+    <#
+    New-UDRow -Columns {
+        New-UDColumn -LargeSize 6 -Content {
+            New-UDChartJS -Type 'pie' -Data $chartData -LabelProperty 'Label' -DataProperty 'Value' -Options $pieChartOptions -BackgroundColor @('rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)') -BorderColor @('rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)') -BorderWidth 1
+        }
+    }
+#>
     New-UDButton -Text "Home" -OnClick {
         Invoke-UDRedirect -Url "/"
     }
-
 }
+
 
 #----------------------------------------------------------------------------------
 #Home page

@@ -4,9 +4,9 @@
 from(bucket: "Hyper_V")
   |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "SystemMetrics")
-  |> filter(fn: (r) => r._field == "CPU_Usage_Percent" or r._field == "Memory_Used_MB")
+  |> filter(fn: (r) => r._field == "CPU_Usage" or r._field == "Memory_Used_MB")
   |> sort(columns: ["_time"], desc: true)
-  |> limit(n: 10)
+  |> limit(n: 100)
 "@,
         [string]$Bucket = 'Hyper_V',
         [string]$Org = 'BjoCorp',
