@@ -16,6 +16,12 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     #$memUsage = $vm.MemoryUsed
     #$memFree = $memAssigned - $memUsage
 
+    $disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'"
+
+    $diskTotal = $disk.Size / 1GB
+    $diskFree = $disk.FreeSpace / 1GB
+    $diskUsed = $diskTotal - $diskFree
+
     $influxData = InfluxFetch
     $parsedData = $influxData | ConvertFrom-Csv
 
@@ -37,25 +43,19 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
 
-    
-    <#
- 
-    $chartData = @(
-        [PSCustomObject]@{ Label = 'Used Memory (MB)'; Value = $memUsage }
-        [PSCustomObject]@{ Label = 'Free Memory (MB)'; Value = $memFree }
+    $diskChartData = @(
+        [PSCustomObject]@{
+            Label = 'Used Disk (GB)'
+            Value = [Math]::Round($diskUsed, 2)
+        }
+        [PSCustomObject]@{
+            Label = 'Free Disk (GB)'
+            Value = [Math]::Round($diskFree, 2)
+        }
     )
 
+    
 
-    $pieChartOptions = @{
-        aspectRatio = 0, 1
-        plugins     = @{
-            title = @{
-                display = $true
-                text    = "Assigned Memory: $memAssigned"
-            }
-        }
-    }
-        #>
     $cpuChartOptions = @{
         plugins = @{
             title = @{
@@ -118,26 +118,126 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
 
-
-    New-UDRow -Columns {
-        New-UDColumn -LargeSize 6 -Content {
-            New-UDChartJS -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
-        }
-        New-UDColumn -LargeSize 6 -Content {
-            New-UDChartJS -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+    $pieChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Disk Usage - C:'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
         }
     }
-
+    
 
     <#
-    New-UDRow -Columns {
-        New-UDColumn -LargeSize 6 -Content {
-            New-UDChartJS -Type 'pie' -Data $chartData -LabelProperty 'Label' -DataProperty 'Value' -Options $pieChartOptions -BackgroundColor @('rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)') -BorderColor @('rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)') -BorderWidth 1
+        New-UDLayout -Columns 2 -Content {
+            #  New-UDColumn -Size 8 -Content {
+            New-UDChartJS -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
+            # }
+            #New-UDColumn -Size 8 -Content {
+            New-UDChartJS -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+            #}
         }
-    }
+        New-UDLayout -Columns 3 -Content {
+            New-UDTypography -Text ""
+            New-UDChartJS -Type 'pie' `
+                -Data           $diskChartData `
+                -LabelProperty  'Label' `
+                -DataProperty   'Value' `
+                -Options        $pieChartOptions `
+                -BackgroundColor @(
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)'
+            ) `
+                -BorderColor @(
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)'
+            ) `
+                -BorderWidth 1
+        }
+    
 #>
-    New-UDButton -Text "Home" -OnClick {
-        Invoke-UDRedirect -Url "/"
+
+    $layout = '{
+    "lg": [
+      {
+        "w": 3,
+        "h": 10,
+        "x": 0,
+        "y": 0,
+        "i": "grid-element-hostInfo",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 4,
+        "h": 11,
+        "x": 3,
+        "y": 0,
+        "i": "grid-element-cpuChart",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 4,
+        "h": 13,
+        "x": 7,
+        "y": 0,
+        "i": "grid-element-memoryChart",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 2,
+        "h": 3,
+        "x": 6,
+        "y": 13,
+        "i": "grid-element-diskChart",
+        "moved": false,
+        "static": false
+      }
+    ]
+  }'
+  
+    New-UDGridLayout -Layout $layout -Content {
+    
+        New-UDCard -Id 'hostInfo' -Style @{
+            'text-align'  = 'center'
+            'padding-top' = '10px'
+            #    'height' = 1000
+        } -Content {
+            New-UDTypography -Text "Host Information" -Variant "h3" -GutterBottom
+            New-UDTypography -Text "Hostname: Kevin-PC" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Runtime: 01:00:00" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Memory: 1048 MB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Disk Space: 50GB" -Variant "h5" -GutterBottom
+            
+       
+        }
+      
+        New-UDChartJS -Id 'cpuChart' -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
+        New-UDChartJS -Id 'memoryChart' -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+        New-UDChartJS -Id 'diskChart' -Type 'pie' `
+            -Data           $diskChartData `
+            -LabelProperty  'Label' `
+            -DataProperty   'Value' `
+            -Options        $pieChartOptions `
+            -BackgroundColor @(
+            'rgba(255, 99, 132, 0.2)',
+            'rgba(54, 162, 235, 0.2)'
+        ) `
+            -BorderColor @(
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)'
+        ) `
+            -BorderWidth 1
+
+        New-UDButton -Text "Home" -OnClick {
+            Invoke-UDRedirect -Url "/"
+        }
     }
 }
 
