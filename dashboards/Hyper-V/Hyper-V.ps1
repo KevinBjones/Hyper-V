@@ -1,14 +1,18 @@
-﻿Import-Module InfluxFetch
+﻿Import-Module InfluxFetchHost
+Import-Module InfluxFetchVM
 Import-Module Get-MyVms
 
 $isoFiles = Get-ChildItem -Path 'C:\Hyper-V\ISO' -Filter '*.iso' -File |
 Select-Object -ExpandProperty Name
 
 #----------------------------------------------------------------------------------
-# Monitor Page
+# Host Monitor Page
 #----------------------------------------------------------------------------------
 
-$MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
+#$MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
+$HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content {
+
+
 
 
     #$vm = Get-MyVMs -Name $vmName
@@ -22,7 +26,7 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     $diskFree = $disk.FreeSpace / 1GB
     $diskUsed = $diskTotal - $diskFree
 
-    $influxData = InfluxFetch
+    $influxData = InfluxFetchHost
     $parsedData = $influxData | ConvertFrom-Csv
 
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
@@ -241,6 +245,202 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     }
 }
 
+#----------------------------------------------------------------------------------
+# VM Monitor Page
+#----------------------------------------------------------------------------------
+
+$VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
+    #$vm = Get-MyVMs -Name $vmName
+    #New-UDTypography -Text $vm
+    $influxData = InfluxFetchVM -VMName $vmName
+    $parsedData = $influxData | ConvertFrom-Csv
+    New-UDTypography -Text $influxData
+
+    $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
+    #New-UDTypography -Text "cpu data: $cpuData"
+    #New-UDTypography -Text "all data: $influxData"
+    $cpuChartData = $cpuData | ForEach-Object {
+        [PSCustomObject]@{
+            Time  = [datetime]$_._time
+            Value = [double]$_._value
+        }
+    }
+
+    $memoryData = $parsedData | Where-Object { $_._field -eq 'Memory_Used_MB' } | Sort-Object { [datetime]$_._time }
+    $memoryChartData = $memoryData | ForEach-Object {
+        [PSCustomObject]@{
+            Time  = [datetime]$_._time
+            Value = [double]$_._value
+        }
+    }
+
+    $diskChartData = @(
+        [PSCustomObject]@{
+            Label = 'Used Disk (GB)'
+            Value = [Math]::Round($diskUsed, 2)
+        }
+        [PSCustomObject]@{
+            Label = 'Free Disk (GB)'
+            Value = [Math]::Round($diskFree, 2)
+        }
+    )
+
+    
+
+    $cpuChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Hypervisor CPU Usage'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
+        }
+        scales  = @{
+            x = @{
+                type  = 'time'
+                time  = @{
+                    unit = 'minute'
+                }
+                title = @{
+                    display = $true
+                    text    = 'Time'
+                }
+            }
+            y = @{
+                title = @{
+                    display = $true
+                    text    = 'Percentage CPU Used'
+                }
+            }
+        }
+    }
+        
+    $memoryChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Hypervisor Memory Usage'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
+        }
+        scales  = @{
+            x = @{
+                type  = 'time'
+                time  = @{
+                    unit = 'minute'
+                }
+                title = @{
+                    display = $true
+                    text    = 'Time'
+                }
+            }
+            y = @{
+                title = @{
+                    display = $true
+                    text    = 'MB'
+                }
+            }
+        }
+    }
+
+    $pieChartOptions = @{
+        plugins = @{
+            title = @{
+                display = $true
+                text    = 'Disk Usage - C:'
+                font    = @{
+                    size   = 24
+                    weight = 'bold'
+                }
+            }
+        }
+    }
+    
+    $layout = '{
+    "lg": [
+      {
+        "w": 3,
+        "h": 10,
+        "x": 0,
+        "y": 0,
+        "i": "grid-element-hostInfo",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 4,
+        "h": 11,
+        "x": 3,
+        "y": 0,
+        "i": "grid-element-cpuChart",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 4,
+        "h": 13,
+        "x": 7,
+        "y": 0,
+        "i": "grid-element-memoryChart",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 2,
+        "h": 3,
+        "x": 6,
+        "y": 13,
+        "i": "grid-element-diskChart",
+        "moved": false,
+        "static": false
+      }
+    ]
+  }'
+  
+    New-UDGridLayout -Layout $layout -Content {
+    
+        New-UDCard -Id 'hostInfo' -Style @{
+            'text-align'  = 'center'
+            'padding-top' = '10px'
+            #    'height' = 1000
+        } -Content {
+            New-UDTypography -Text "Host Information" -Variant "h3" -GutterBottom
+            New-UDTypography -Text "Hostname: Kevin-PC" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Runtime: 01:00:00" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Memory: 1048 MB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Disk Space: 50GB" -Variant "h5" -GutterBottom
+            
+       
+        }
+      
+        New-UDChartJS -Id 'cpuChart' -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
+        New-UDChartJS -Id 'memoryChart' -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+        New-UDChartJS -Id 'diskChart' -Type 'pie' `
+            -Data           $diskChartData `
+            -LabelProperty  'Label' `
+            -DataProperty   'Value' `
+            -Options        $pieChartOptions `
+            -BackgroundColor @(
+            'rgba(255, 99, 132, 0.2)',
+            'rgba(54, 162, 235, 0.2)'
+        ) `
+            -BorderColor @(
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)'
+        ) `
+            -BorderWidth 1
+
+        New-UDButton -Text "Home" -OnClick {
+            Invoke-UDRedirect -Url "/"
+        }
+    }
+}
 
 #----------------------------------------------------------------------------------
 #Home page
@@ -249,58 +449,71 @@ $MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
 $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
     New-UDTypography -Text "Hyper-V Manager" -Variant "h4"
-   
-    New-UDRow -Columns {
-        New-UDColumn -Content {
-            New-UDButton -Text "Refresh" -OnClick {
-                Sync-UDElement -Id "vmTable"
+    New-UDButtonGroup -Children {
+        New-UDButtonGroupItem -Text "Create VM" -OnClick {
+            Show-UDModal -Content {
+                New-UDTypography -Text "Create New VM" -Variant "h5"
+                New-UDForm -Content {
+                    New-UDTextbox -Id "vmName" -Label "VM Name" 
+                    New-UDTextbox -Id "memorySize" -Label "Memory Size (MB)" 
+                    New-UDTextbox -Id "diskSize" -Label "Disk Size (GB)" 
+                    New-UDSelect -Id "isoSelect" -Label "Select an ISO" -Option {
+                        foreach ($iso in $isoFiles) {
+                            New-UDSelectOption -Name $iso -Value $iso
+                        }
+                    }
+                } -OnSubmit {
+                    $vmName = (Get-UDElement -Id "vmName").Value
+                    $memorySize = [int](Get-UDElement -Id "memorySize").Value
+                    $diskSize = [int](Get-UDElement -Id "diskSize").Value
+                    $selectedISO = (Get-UDElement -Id "isoSelect").Value
+
+                    
+                    
+
+                    Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
+                    try {
+                        New-VM -Name $vmName `
+                            -MemoryStartupBytes ($memorySize * 1MB) `
+                            -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
+                            -NewVHDSizeBytes ($diskSize * 1GB)
+                        Set-VMDvdDrive -VMName $vmName -Path "C:\Hyper-V\ISO\$selectedISO"
+                        Enable-VMResourceMetering -VMName $vmName
+                        Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
+                    }
+                    catch {
+                        Show-UDToast -Message "Error creating VM: $_" -Duration 5000 
+                    }
+
+                    Sync-UDElement -Id "vmTable"
+                    Hide-UDModal
+                }
+            } -Footer {
+                New-UDButton -Text "Close" -OnClick { Hide-UDModal }
             }
         }
-        New-UDColumn -Content {
-            New-UDButton -Text "Create VM" -OnClick {
-                Show-UDModal -Content {
-                    New-UDTypography -Text "Create New VM" -Variant "h5"
-                    New-UDForm -Content {
-                        New-UDTextbox -Id "vmName" -Label "VM Name" 
-                        New-UDTextbox -Id "memorySize" -Label "Memory Size (MB)" 
-                        New-UDTextbox -Id "diskSize" -Label "Disk Size (GB)" 
-                        New-UDSelect -Id "isoSelect" -Label "Select an ISO" -Option {
-                            foreach ($iso in $isoFiles) {
-                                New-UDSelectOption -Name $iso -Value $iso
-                            }
-                        }
-                    } -OnSubmit {
-                        $vmName = (Get-UDElement -Id "vmName").Value
-                        $memorySize = [int](Get-UDElement -Id "memorySize").Value
-                        $diskSize = [int](Get-UDElement -Id "diskSize").Value
-                        $selectedISO = (Get-UDElement -Id "isoSelect").Value
-
-                        
-                        
-
-                        Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
-                        try {
-                            New-VM -Name $vmName `
-                                -MemoryStartupBytes ($memorySize * 1MB) `
-                                -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
-                                -NewVHDSizeBytes ($diskSize * 1GB)
-                            Set-VMDvdDrive -VMName $vmName -Path "C:\Hyper-V\ISO\$selectedISO"
-                            Enable-VMResourceMetering -VMName $vmName
-                            Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
-                        }
-                        catch {
-                            Show-UDToast -Message "Error creating VM: $_" -Duration 5000 
-                        }
-
-                        Sync-UDElement -Id "vmTable"
-                        Hide-UDModal
-                    }
-                } -Footer {
-                    New-UDButton -Text "Close" -OnClick { Hide-UDModal }
-                }
-            }
+        New-UDButtonGroupItem -Text "Refresh" -OnClick {
+            Sync-UDElement -Id "vmTable"
+        }
+        New-UDButtonGroupItem -Text "Monitor Hypervisor" -OnClick {
+            Invoke-UDRedirect -Url "/monitor/host"
         }
     }
+
+<#
+    New-UDRow -Columns {
+        New-UDColumn -SmallSize 6 -Content {
+            New-UDButton -Text "Refresh" -OnClick {
+               
+            }
+        }
+        New-UDColumn -SmallSize 6 -Content {
+            New-UDButton -Text "Create VM" -OnClick {
+            
+            }
+            #>
+        
+    
 
     #----------------------------------------------------------------------------------
     #VM Tabel
@@ -366,5 +579,7 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
 New-UDApp -Title "Hyper-V Manager" -Pages @(
     $HomePage,
-    $MonitorPage
+ #   $VMMonitorPage,
+    $HostMonitorPage,
+    $VMMonitorPage
 )

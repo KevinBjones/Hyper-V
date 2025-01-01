@@ -67,6 +67,17 @@
             }
         }
     }, @{
+        Name       = 'CPUUsage(%)'
+        Expression = {
+            if ($_.State -eq 'Running') {
+                $_.CPUUsage
+            }
+            else {
+                'N/A'
+            }
+        }
+    },
+    @{
         Name       = 'IPAddress'
         Expression = {
             if ($_.State -eq 'Running') {

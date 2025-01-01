@@ -15,21 +15,26 @@ function Get-SystemMetrics {
 }
 
 function Get-VMSystemMetrics {
-    $vmMetricsList = @()
-    $vms = Get-VM
-    foreach ($vm in $vms) {
-        
-        $measure = Measure-VM -VM $vm
+     $vmMetricsList = @()
 
+    $vms = Get-MyVMs
+
+    foreach ($vm in $vms) {
+
+        [double]$cpuUsage = 0
+        [double]$memoryUsed = 0
+        
+        $cpuUsage = [math]::Round([double]$vm.'CPUUsage(%)', 2)
+        $memoryUsed = [math]::Round([double]$vm.MemoryUsed, 2)
+   
         $metrics = @{
-            CPU_Usage      = [math]::Round($measure.AverageProcessorUsage, 2)
-            Memory_Used_MB = [math]::Round($vm.MemoryDemand / 1MB, 2)
             VM_Name        = $vm.Name
+            CPU_Usage      = $cpuUsage
+            Memory_Used_MB = $memoryUsed
         }
 
         $vmMetricsList += $metrics
     }
-    
 
     return $vmMetricsList
 }

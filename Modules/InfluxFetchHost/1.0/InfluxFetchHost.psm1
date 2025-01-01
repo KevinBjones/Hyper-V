@@ -1,4 +1,4 @@
-﻿function InfluxFetch {
+﻿function InfluxFetchHost {
     param (
         [string]$Query = @"
 from(bucket: "Hyper_V")
