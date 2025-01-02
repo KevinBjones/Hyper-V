@@ -88,14 +88,6 @@
                 'N/A'
             }
         }
-    }, @{
-        Name       = 'Toggle'
-        Expression = { $_.Name }
-    }, @{
-        Name       = 'Restart'
-        Expression = { $_.Name }
-    }, @{
-        Name       = 'Monitor'
-        Expression = { $_.Name }
-    }
+    
+}
 }

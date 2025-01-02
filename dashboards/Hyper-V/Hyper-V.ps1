@@ -466,21 +466,6 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
         }
     }
 
-    <#
-    New-UDRow -Columns {
-        New-UDColumn -SmallSize 6 -Content {
-            New-UDButton -Text "Refresh" -OnClick {
-               
-            }
-        }
-        New-UDColumn -SmallSize 6 -Content {
-            New-UDButton -Text "Create VM" -OnClick {
-            
-            }
-            #>
-        
-    
-
     #----------------------------------------------------------------------------------
     #VM Tabel
     #----------------------------------------------------------------------------------
@@ -488,7 +473,7 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
     New-UDDynamic -Id "vmTable" -Content {
         
         $vms = Get-MyVMs 
-
+        
         if (-not $vms -or $vms.Count -eq 0) {
             New-UDTypography -Text "No VMs created." -Variant "subtitle1"
         }
@@ -526,6 +511,45 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         Sync-UDElement -Id "vmTable"
                     }
                 }
+                New-UDTableColumn -Property "Edit"              -Title "Edit" -Render {
+                    New-UDIconButton -Icon (New-UDIcon -Icon "Wrench") -OnClick {
+                        $currentVM = Get-VM -Name $EventData.Name
+                        $currentName = $currentVM.Name
+                        $currentMemoryMB = [int]($currentVM.MemoryStartup / 1MB)
+
+                        Show-UDModal -Content {
+                            New-UDTypography -Text "Edit VM '$($EventData.Name)'" -Variant "h5"
+                            New-UDForm -Content {
+                                New-UDTextbox -Id "editVMName" -Label "VM Name" -Value $currentName
+                                New-UDTextbox -Id "editMemorySize" -Label "Memory Size (MB)" -Value $currentMemoryMB
+                            } -OnSubmit {
+                                $newName = (Get-UDElement -Id "editVMName").Value
+                                $newMemorySize = [int](Get-UDElement -Id "editMemorySize").Value
+                    
+                                try {
+                                    if ($newName -ne $currentName) {
+                                        Rename-VM -Name $currentName -NewName $newName
+                                        $currentName = $newName
+                                    }
+                                    Set-VM -Name $currentName -MemoryStartupBytes ($newMemorySize * 1MB)
+                                    Show-UDToast -Message "VM '$currentName' updated successfully." -Duration 4000
+                                }
+                                catch {
+                                    Show-UDToast -Message "Error editing VM: $_" -Duration 5000
+                                }
+                    
+                                Sync-UDElement -Id "vmTable"
+                                Hide-UDModal
+                            }
+                        } -Footer {
+                            New-UDButton -Text "Close" -OnClick { Hide-UDModal }
+                        }
+
+
+                    }
+                }
+
+
 
                 New-UDTableColumn -Property "Monitoring"              -Title "Monitoring Data" -Render {
                     New-UDButton -Icon(New-UDIcon -Icon "Heartbeat") -OnClick {
@@ -545,7 +569,6 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
 New-UDApp -Title "Hyper-V Manager" -Pages @(
     $HomePage,
-    #   $VMMonitorPage,
     $HostMonitorPage,
     $VMMonitorPage
 )
