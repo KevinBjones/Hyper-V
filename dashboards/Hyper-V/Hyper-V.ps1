@@ -9,20 +9,17 @@ Select-Object -ExpandProperty Name
 # Host Monitor Page
 #----------------------------------------------------------------------------------
 
-#$MonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
 $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content {
 
 
+    $uptime = Get-Uptime
+    $formattedUptime = "{0}d {1}h {2}m {3}s" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds
 
-
-    #$vm = Get-MyVMs -Name $vmName
-    #$memAssigned = $vm.MemoryAssigned
-    #$memUsage = $vm.MemoryUsed
-    #$memFree = $memAssigned - $memUsage
-
+    $totalMemoryMB = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1MB)
+    
     $disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'"
-
     $diskTotal = $disk.Size / 1GB
+    $diskTotalRounded = [math]::Round($diskTotal)
     $diskFree = $disk.FreeSpace / 1GB
     $diskUsed = $diskTotal - $diskFree
 
@@ -30,8 +27,6 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
     $parsedData = $influxData | ConvertFrom-Csv
 
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
-    #New-UDTypography -Text "cpu data: $cpuData"
-    #New-UDTypography -Text "all data: $influxData"
     $cpuChartData = $cpuData | ForEach-Object {
         [PSCustomObject]@{
             Time  = [datetime]$_._time
@@ -135,36 +130,6 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
     
-
-    <#
-        New-UDLayout -Columns 2 -Content {
-            #  New-UDColumn -Size 8 -Content {
-            New-UDChartJS -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
-            # }
-            #New-UDColumn -Size 8 -Content {
-            New-UDChartJS -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
-            #}
-        }
-        New-UDLayout -Columns 3 -Content {
-            New-UDTypography -Text ""
-            New-UDChartJS -Type 'pie' `
-                -Data           $diskChartData `
-                -LabelProperty  'Label' `
-                -DataProperty   'Value' `
-                -Options        $pieChartOptions `
-                -BackgroundColor @(
-                'rgba(255, 99, 132, 0.2)',
-                'rgba(54, 162, 235, 0.2)'
-            ) `
-                -BorderColor @(
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)'
-            ) `
-                -BorderWidth 1
-        }
-    
-#>
-
     $layout = '{
     "lg": [
       {
@@ -211,13 +176,12 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         New-UDCard -Id 'hostInfo' -Style @{
             'text-align'  = 'center'
             'padding-top' = '10px'
-            #    'height' = 1000
         } -Content {
             New-UDTypography -Text "Host Information" -Variant "h3" -GutterBottom
-            New-UDTypography -Text "Hostname: Kevin-PC" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Runtime: 01:00:00" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Total Memory: 1048 MB" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Total Disk Space: 50GB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Hostname: $env:computername" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Runtime: $formattedUptime" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Memory: $totalMemoryMB MB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Disk Space: $diskTotalRounded GB" -Variant "h5" -GutterBottom
             
        
         }
@@ -250,11 +214,14 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
 #----------------------------------------------------------------------------------
 
 $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
-    #$vm = Get-MyVMs -Name $vmName
-    #New-UDTypography -Text $vm
+    $vm = Get-MyVMs -Name $vmName
+    $uptime = $vm.uptime
+    $assignedMemory = $vm.memoryAssigned
+
+    New-UDTypography -Text $vm
     $influxData = InfluxFetchVM -VMName $vmName
     $parsedData = $influxData | ConvertFrom-Csv
-    New-UDTypography -Text $influxData
+    #New-UDTypography -Text $influxData
 
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
     #New-UDTypography -Text "cpu data: $cpuData"
@@ -291,7 +258,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         plugins = @{
             title = @{
                 display = $true
-                text    = 'Hypervisor CPU Usage'
+                text    = 'CPU Usage'
                 font    = @{
                     size   = 24
                     weight = 'bold'
@@ -322,7 +289,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         plugins = @{
             title = @{
                 display = $true
-                text    = 'Hypervisor Memory Usage'
+                text    = 'Memory Usage'
                 font    = @{
                     size   = 24
                     weight = 'bold'
@@ -408,13 +375,12 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         New-UDCard -Id 'hostInfo' -Style @{
             'text-align'  = 'center'
             'padding-top' = '10px'
-            #    'height' = 1000
         } -Content {
             New-UDTypography -Text "Host Information" -Variant "h3" -GutterBottom
-            New-UDTypography -Text "Hostname: Kevin-PC" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Runtime: 01:00:00" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Total Memory: 1048 MB" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Total Disk Space: 50GB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Hostname: $vmname" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Runtime: $uptime" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Memory: $assignedMemory MB" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Disk Space: 50GB (placeholder)" -Variant "h5" -GutterBottom
             
        
         }
@@ -500,7 +466,7 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
         }
     }
 
-<#
+    <#
     New-UDRow -Columns {
         New-UDColumn -SmallSize 6 -Content {
             New-UDButton -Text "Refresh" -OnClick {
@@ -579,7 +545,7 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
 New-UDApp -Title "Hyper-V Manager" -Pages @(
     $HomePage,
- #   $VMMonitorPage,
+    #   $VMMonitorPage,
     $HostMonitorPage,
     $VMMonitorPage
 )
