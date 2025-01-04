@@ -52,7 +52,7 @@ function Write-MetricsToInflux {
         Metrics      = $Metrics
         Bucket       = 'Hyper_V'
         Server       = 'http://localhost:8086'
-        Token        = 'QgVqXUdAnblkjmTtPvr7T_62naiXJ3uDPfouIZorWVWfLzWGRBPfIhP-DxcsqGZRFg20UwQbfBEDqpHd3Utu4A=='
+        Token        = $Secret:influxToken
         Organisation = 'BjoCorp'
     }
 

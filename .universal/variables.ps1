@@ -1,0 +1,1 @@
+﻿New-PSUVariable -Name "influxToken" -Vault "Database"
