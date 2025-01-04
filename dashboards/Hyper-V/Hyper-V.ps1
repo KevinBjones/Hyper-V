@@ -548,13 +548,20 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
                     }
                 }
-
+                
 
 
                 New-UDTableColumn -Property "Monitoring"              -Title "Monitoring Data" -Render {
                     New-UDButton -Icon(New-UDIcon -Icon "Heartbeat") -OnClick {
                         $vmName = $EventData.Name
                         Invoke-UDRedirect -Url "/monitor/$($vmName)"
+                    }
+                }
+                New-UDTableColumn -Property "Delete"              -Title "Delete" -Render {
+                    New-UDIconButton -Icon (New-UDIcon -Icon "Trash") -OnClick {
+                        $vmName = $EventData.Name
+                        Remove-VM $vmName
+
                     }
                 }
             )
