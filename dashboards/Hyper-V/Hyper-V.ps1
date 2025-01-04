@@ -217,8 +217,11 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     $vm = Get-MyVMs -Name $vmName
     $uptime = $vm.uptime
     $assignedMemory = $vm.memoryAssigned
-
-    New-UDTypography -Text $vm
+    $vhd = (Get-VM -Name $vmName).HardDrives | Get-VHD
+    $vmDiskUsed = $vhd.FileSize / 1GB
+    $vmDiskMax = $vhd.Size / 1GB
+    $vmDiskFree = $vmDiskMax - $vmDiskUsed
+    # New-UDTypography -Text $vm
     $influxData = InfluxFetchVM -VMName $vmName
     $parsedData = $influxData | ConvertFrom-Csv
     #New-UDTypography -Text $influxData
@@ -244,11 +247,11 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     $diskChartData = @(
         [PSCustomObject]@{
             Label = 'Used Disk (GB)'
-            Value = [Math]::Round($diskUsed, 2)
+            Value = [Math]::Round($vmDiskUsed, 2)
         }
         [PSCustomObject]@{
             Label = 'Free Disk (GB)'
-            Value = [Math]::Round($diskFree, 2)
+            Value = [Math]::Round($vmDiskFree, 2)
         }
     )
 
@@ -320,7 +323,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         plugins = @{
             title = @{
                 display = $true
-                text    = 'Disk Usage - C:'
+                text    = 'Disk Usage - Virtual Disk'
                 font    = @{
                     size   = 24
                     weight = 'bold'
@@ -380,7 +383,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
             New-UDTypography -Text "Hostname: $vmname" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Runtime: $uptime" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Total Memory: $assignedMemory MB" -Variant "h5" -GutterBottom
-            New-UDTypography -Text "Total Disk Space: 50GB (placeholder)" -Variant "h5" -GutterBottom
+            New-UDTypography -Text "Total Disk Space: $vmDiskMax GB" -Variant "h5" -GutterBottom
             
        
         }

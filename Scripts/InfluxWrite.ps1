@@ -15,7 +15,7 @@ function Get-SystemMetrics {
 }
 
 function Get-VMSystemMetrics {
-     $vmMetricsList = @()
+    $vmMetricsList = @()
 
     $vms = Get-MyVMs
 
