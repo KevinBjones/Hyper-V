@@ -11,7 +11,7 @@ from(bucket: "Hyper_V")
         [string]$Bucket = 'Hyper_V',
         [string]$Org = 'BjoCorp',
         [string]$Server = 'http://localhost:8086',
-        [string]$Token = 'QgVqXUdAnblkjmTtPvr7T_62naiXJ3uDPfouIZorWVWfLzWGRBPfIhP-DxcsqGZRFg20UwQbfBEDqpHd3Utu4A=='
+        [string]$Token = $Secret:influxToken
     )
 
     $url = "$Server/api/v2/query?org=$Org"
