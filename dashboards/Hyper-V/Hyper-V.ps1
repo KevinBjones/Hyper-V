@@ -215,20 +215,20 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
 
 $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     $vm = Get-MyVMs -Name $vmName
+   
     $uptime = $vm.uptime
+  
     $assignedMemory = $vm.memoryAssigned
+  
     $vhd = (Get-VM -Name $vmName).HardDrives | Get-VHD
     $vmDiskUsed = $vhd.FileSize / 1GB
     $vmDiskMax = $vhd.Size / 1GB
     $vmDiskFree = $vmDiskMax - $vmDiskUsed
-    # New-UDTypography -Text $vm
+
     $influxData = InfluxFetchVM -VMName $vmName
     $parsedData = $influxData | ConvertFrom-Csv
-    #New-UDTypography -Text $influxData
 
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
-    #New-UDTypography -Text "cpu data: $cpuData"
-    #New-UDTypography -Text "all data: $influxData"
     $cpuChartData = $cpuData | ForEach-Object {
         [PSCustomObject]@{
             Time  = [datetime]$_._time
