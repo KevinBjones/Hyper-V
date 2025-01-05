@@ -1,1 +1,1 @@
-﻿New-PSUTerminal -Name "Test" -IdleTimeout 0
+﻿

@@ -50,10 +50,10 @@ function Write-MetricsToInflux {
         Measure      = $Measure
         Tags         = @{ Host = $HostTag }
         Metrics      = $Metrics
-        Bucket       = 'Hyper_V'
-        Server       = 'http://localhost:8086'
+        Bucket       = $Secret:influxBucket
+        Server       = $Secret:influxServer
         Token        = $Secret:influxToken
-        Organisation = 'BjoCorp'
+        Organisation = $Secret:influxOrg
     }
 
     Write-Influx @influxParams

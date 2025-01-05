@@ -8,9 +8,9 @@ from(bucket: "Hyper_V")
   |> sort(columns: ["_time"], desc: true)
   |> limit(n: 100)
 "@,
-        [string]$Bucket = 'Hyper_V',
-        [string]$Org = 'BjoCorp',
-        [string]$Server = 'http://localhost:8086',
+        [string]$Bucket = $Secret:influxBucket,
+        [string]$Org = $Secret:influxOrg,
+        [string]$Server = $Secret:influxServer,
         [string]$Token = $Secret:influxToken
     )
 
