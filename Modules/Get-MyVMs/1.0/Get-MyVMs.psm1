@@ -1,4 +1,10 @@
-﻿function Get-MyVMs {
+﻿<#
+
+DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
+
+#>
+
+function Get-MyVMs {
     param(
         [string]$Name
     )

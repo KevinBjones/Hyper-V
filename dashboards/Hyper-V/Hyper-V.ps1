@@ -1,4 +1,10 @@
-﻿Import-Module InfluxFetchHost
+﻿<#
+
+DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
+
+#>
+
+Import-Module InfluxFetchHost
 Import-Module InfluxFetchVM
 Import-Module Get-MyVms
 

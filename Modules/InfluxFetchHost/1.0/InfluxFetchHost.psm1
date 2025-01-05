@@ -1,4 +1,10 @@
-﻿function InfluxFetchHost {
+﻿<#
+
+DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
+
+#>
+
+function InfluxFetchHost {
     param (
         [string]$Query = @"
 from(bucket: "Hyper_V")

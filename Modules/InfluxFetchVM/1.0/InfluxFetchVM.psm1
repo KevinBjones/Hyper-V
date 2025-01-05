@@ -1,4 +1,10 @@
-﻿function InfluxFetchVM {
+﻿<#
+
+DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
+
+#>
+
+function InfluxFetchVM {
     param (
         [string]$VMName,
         [string]$Query = @"
