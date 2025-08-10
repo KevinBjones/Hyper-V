@@ -5,6 +5,7 @@ This project is a **PowerShell Universal (PSU)** dashboard that lets you manage 
 ---
 
 ## Prerequisites
+The following must be installed so the dashboard can work. Installation of Influxdb can be done directly on the machine or through Docker.
   - Windows 10/11 or Windows Server with Hyper-V role installed
   - [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5)
   - [Powershell Universal](https://powershelluniversal.com/downloads)
@@ -34,7 +35,6 @@ This project is a **PowerShell Universal (PSU)** dashboard that lets you manage 
    - `C:\Hyper-V\iso` → put ISO files here
    - *(Optional)* `C:\Hyper-V\Disks` and `C:\Hyper-V\VM` → you can set Hyper-V to store disks and VM files here so everything is in one place
 
-7. Access the Powershell Universal dashboard at http://localhost:5000/Hyperv/ (or http://[yourip]:5000/Hyperv/ if hosting elsewhere)
 
 ---
 
@@ -61,3 +61,15 @@ Gives the user basic data on the hypervisor or a VM and allows the user to see h
 - Historical CPU Usage
 - Historical Memory Usage
 - Disk usage percentage (free and used)
+
+## Usage
+
+### Powershell Universal
+
+The admin console can be reached on port 5000 of the server running PSU. The dashboard has the endpoint /Hyperv
+- **Admin console**: http://localhost:5000/admin
+- **Dashboard**: http://localhost:5000/Hyperv/
+
+### Influxdb
+
+Influxdb can be accessed on port 8086: http://localhost:8086
