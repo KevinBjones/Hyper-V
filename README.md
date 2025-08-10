@@ -29,9 +29,11 @@ The following must be installed so the dashboard can work. Installation of Influ
    - `influxToken`  
    Add the values for your InfluxDB instance.
 
-5. Import Influx & Dotenv module in Powershell Universal
+5. Import Influx and Dotenv modules in Powershell Universal (Platform -> Modules -> Repositories)
 
-6. Create folder structure for Hyper-V:
+6. Import Influx & Dotenv module in Powershell Universal
+
+7. Create folder structure for Hyper-V:
    - `C:\Hyper-V\iso` → put ISO files here
    - *(Optional)* `C:\Hyper-V\Disks` and `C:\Hyper-V\VM` → you can set Hyper-V to store disks and VM files here so everything is in one place
 
