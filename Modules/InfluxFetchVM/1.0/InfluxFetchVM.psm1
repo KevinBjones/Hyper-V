@@ -4,8 +4,10 @@ DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling
 
 #>
 
+# Query InfluxDB for VM metrics and return CSV
 function InfluxFetchVM {
     param (
+        # Flux query: last hour of CPU and Memory data
         [string]$VMName,
         [string]$Query = @"
   from(bucket: "Hyper_V")
@@ -16,6 +18,7 @@ function InfluxFetchVM {
   |> sort(columns: ["_time"], desc: true)
   |> limit(n: 100)
 "@,
+        # Influx connection info
         [string]$Bucket = $Secret:influxBucket,
         [string]$Org = $Secret:influxOrg,
         [string]$Server = $Secret:influxServer,
@@ -25,6 +28,7 @@ function InfluxFetchVM {
 
     $url = "$Server/api/v2/query?org=$Org"
 
+    # Send Influx body and headers to Influx
     $body = @{
         query = $Query
     } | ConvertTo-Json

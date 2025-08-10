@@ -1,13 +1,15 @@
-﻿<#
+﻿﻿<#
 
 DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
 
 #>
 
+# Load custom modules for InfluxDB data pulls and VM data
 Import-Module InfluxFetchHost
 Import-Module InfluxFetchVM
 Import-Module Get-MyVms
 
+# Load available ISO images in advance for the Create VM modal
 $isoFiles = Get-ChildItem -Path 'C:\Hyper-V\ISO' -Filter '*.iso' -File |
 Select-Object -ExpandProperty Name
 
@@ -15,23 +17,28 @@ Select-Object -ExpandProperty Name
 # Host Monitor Page
 #----------------------------------------------------------------------------------
 
+# Page showing hypervisor-level health and charts (CPU, memory, disk)
 $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content {
 
-
+    # Format OS uptime 
     $uptime = Get-Uptime
     $formattedUptime = "{0}d {1}h {2}m {3}s" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds
 
+    # Total physical memory in MB
     $totalMemoryMB = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1MB)
     
+    # Basic C: drive stats in GB
     $disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'"
     $diskTotal = $disk.Size / 1GB
     $diskTotalRounded = [math]::Round($diskTotal)
     $diskFree = $disk.FreeSpace / 1GB
     $diskUsed = $diskTotal - $diskFree
 
+    # Pull last hour of host metrics from InfluxDB and parse CSV into objects
     $influxData = InfluxFetchHost
     $parsedData = $influxData | ConvertFrom-Csv
 
+    # Build time series for CPU chart
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
     $cpuChartData = $cpuData | ForEach-Object {
         [PSCustomObject]@{
@@ -40,6 +47,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
 
+    # Build time series for Memory chart
     $memoryData = $parsedData | Where-Object { $_._field -eq 'Memory_Used_MB' } | Sort-Object { [datetime]$_._time }
     $memoryChartData = $memoryData | ForEach-Object {
         [PSCustomObject]@{
@@ -48,6 +56,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
 
+    # Build dataset for disk usage pie chart
     $diskChartData = @(
         [PSCustomObject]@{
             Label = 'Used Disk (GB)'
@@ -59,8 +68,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     )
 
-    
-
+    # Chart.js options for CPU chart 
     $cpuChartOptions = @{
         plugins = @{
             title = @{
@@ -92,6 +100,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
         
+    # Chart.js options for Memory chart in MB
     $memoryChartOptions = @{
         plugins = @{
             title = @{
@@ -123,6 +132,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
 
+    # Chart.js options for disk usage pie chart
     $pieChartOptions = @{
         plugins = @{
             title = @{
@@ -136,6 +146,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         }
     }
     
+    # Grid layout for cards and charts 
     $layout = '{
     "lg": [
       {
@@ -177,8 +188,10 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
     ]
   }'
   
+    # Render grid: info card + charts + Home button
     New-UDGridLayout -Layout $layout -Content {
     
+        # Host info summary card
         New-UDCard -Id 'hostInfo' -Style @{
             'text-align'  = 'center'
             'padding-top' = '10px'
@@ -188,12 +201,12 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
             New-UDTypography -Text "Runtime: $formattedUptime" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Total Memory: $totalMemoryMB MB" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Total Disk Space: $diskTotalRounded GB" -Variant "h5" -GutterBottom
-            
-       
         }
       
+        # Time-series charts and disk pie
         New-UDChartJS -Id 'cpuChart' -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
         New-UDChartJS -Id 'memoryChart' -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+        # Pie chart 
         New-UDChartJS -Id 'diskChart' -Type 'pie' `
             -Data           $diskChartData `
             -LabelProperty  'Label' `
@@ -209,6 +222,7 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
         ) `
             -BorderWidth 1
 
+        # Navigate back to Home
         New-UDButton -Text "Home" -OnClick {
             Invoke-UDRedirect -Url "/"
         }
@@ -219,21 +233,25 @@ $HostMonitorPage = New-UDPage -Name 'Host Monitor' -Url '/monitor/host' -Content
 # VM Monitor Page
 #----------------------------------------------------------------------------------
 
+# Page showing per-VM metrics and charts. 
 $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
+    # Fetch VM details through Get-MyVMs module
     $vm = Get-MyVMs -Name $vmName
    
     $uptime = $vm.uptime
-  
     $assignedMemory = $vm.memoryAssigned
   
+    # Inspect VHD to compute used/free/max storage in GB
     $vhd = (Get-VM -Name $vmName).HardDrives | Get-VHD
     $vmDiskUsed = $vhd.FileSize / 1GB
     $vmDiskMax = $vhd.Size / 1GB
     $vmDiskFree = $vmDiskMax - $vmDiskUsed
 
+    # Pull last hour of VM metrics from InfluxDB and parse CSV into objects
     $influxData = InfluxFetchVM -VMName $vmName
     $parsedData = $influxData | ConvertFrom-Csv
 
+    # Build CPU chart dataset
     $cpuData = $parsedData | Where-Object { $_._field -eq 'CPU_Usage' } | Sort-Object { [datetime]$_._time }
     $cpuChartData = $cpuData | ForEach-Object {
         [PSCustomObject]@{
@@ -242,6 +260,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
 
+    # Build Memory chart dataset (MB used)
     $memoryData = $parsedData | Where-Object { $_._field -eq 'Memory_Used_MB' } | Sort-Object { [datetime]$_._time }
     $memoryChartData = $memoryData | ForEach-Object {
         [PSCustomObject]@{
@@ -250,6 +269,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
 
+    # Build dataset for VM disk usage pie
     $diskChartData = @(
         [PSCustomObject]@{
             Label = 'Used Disk (GB)'
@@ -261,8 +281,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     )
 
-    
-
+    # Chart.js options: CPU (time axis)
     $cpuChartOptions = @{
         plugins = @{
             title = @{
@@ -294,6 +313,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
         
+    # Chart.js options: Memory in MB
     $memoryChartOptions = @{
         plugins = @{
             title = @{
@@ -325,6 +345,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
 
+    # Chart.js options: VM disk usage pie
     $pieChartOptions = @{
         plugins = @{
             title = @{
@@ -338,6 +359,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         }
     }
     
+    # Grid layout for VM info + charts
     $layout = '{
     "lg": [
       {
@@ -379,8 +401,10 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
     ]
   }'
   
+    # Render grid: VM summary + charts + Home button
     New-UDGridLayout -Layout $layout -Content {
     
+        # VM summary card
         New-UDCard -Id 'hostInfo' -Style @{
             'text-align'  = 'center'
             'padding-top' = '10px'
@@ -390,12 +414,12 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
             New-UDTypography -Text "Runtime: $uptime" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Total Memory: $assignedMemory MB" -Variant "h5" -GutterBottom
             New-UDTypography -Text "Total Disk Space: $vmDiskMax GB" -Variant "h5" -GutterBottom
-            
-       
         }
       
+        # Charts
         New-UDChartJS -Id 'cpuChart' -Type 'line' -Data $cpuChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $cpuChartOptions 
         New-UDChartJS -Id 'memoryChart' -Type 'line' -Data $memoryChartData -LabelProperty 'Time' -DataProperty 'Value' -Options $memoryChartOptions 
+        # Pie chart for VM disk usage
         New-UDChartJS -Id 'diskChart' -Type 'pie' `
             -Data           $diskChartData `
             -LabelProperty  'Label' `
@@ -411,6 +435,7 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
         ) `
             -BorderWidth 1
 
+        # Navigate back to Home
         New-UDButton -Text "Home" -OnClick {
             Invoke-UDRedirect -Url "/"
         }
@@ -421,10 +446,13 @@ $VMMonitorPage = New-UDPage -Name 'Monitor' -Url '/monitor/:vmName' -Content {
 #Home page
 #----------------------------------------------------------------------------------
 
+# Landing page: actions (Create/Refresh/Monitor) + VM table with controls
 $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
 
+    # Page header and action buttons
     New-UDTypography -Text "Hyper-V Manager" -Variant "h4"
     New-UDButtonGroup -Children {
+        # "Create VM" opens modal with settings
         New-UDButtonGroupItem -Text "Create VM" -OnClick {
             Show-UDModal -Content {
                 New-UDTypography -Text "Create New VM" -Variant "h5"
@@ -438,16 +466,16 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         }
                     }
                 } -OnSubmit {
+                    # Read form values and cast numeric fields
                     $vmName = (Get-UDElement -Id "vmName").Value
                     $memorySize = [int](Get-UDElement -Id "memorySize").Value
                     $diskSize = [int](Get-UDElement -Id "diskSize").Value
                     $selectedISO = (Get-UDElement -Id "isoSelect").Value
 
-                    
-                    
-
+                    # Feedback notification with VM info
                     Show-UDToast -Message "$vmName, $memorySize, $diskSize" -Duration 3000
                     try {
+                        # Create VM with new VHD and attach ISO and enable metering (important!!)
                         New-VM -Name $vmName `
                             -MemoryStartupBytes ($memorySize * 1MB) `
                             -NewVHDPath "C:\Hyper-V\Disk\$vmName.vhdx" `
@@ -457,9 +485,11 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         Show-UDToast -Message "VM '$vmName' created successfully." -Duration 3000
                     }
                     catch {
+                        # Error notification
                         Show-UDToast -Message "Error creating VM: $_" -Duration 5000 
                     }
 
+                    # Refresh table and close modal
                     Sync-UDElement -Id "vmTable"
                     Hide-UDModal
                 }
@@ -467,9 +497,11 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                 New-UDButton -Text "Close" -OnClick { Hide-UDModal }
             }
         }
+        # Manually refresh VM table
         New-UDButtonGroupItem -Text "Refresh" -OnClick {
             Sync-UDElement -Id "vmTable"
         }
+        # Navigate to host-level monitor
         New-UDButtonGroupItem -Text "Monitor Hypervisor" -OnClick {
             Invoke-UDRedirect -Url "/monitor/host"
         }
@@ -479,14 +511,17 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
     #VM Tabel
     #----------------------------------------------------------------------------------
 
+    # Dynamic section for the VM list
     New-UDDynamic -Id "vmTable" -Content {
         
+        # Query current VMs
         $vms = Get-MyVMs 
         
         if (-not $vms -or $vms.Count -eq 0) {
             New-UDTypography -Text "No VMs created." -Variant "subtitle1"
         }
         else {
+            # Table with properties and action columns
             New-UDTable -Data $vms -Columns @(
                 New-UDTableColumn -Property "Name"               -Title "Name"
                 New-UDTableColumn -Property "State"              -Title "State"
@@ -494,6 +529,8 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                 New-UDTableColumn -Property "MemoryUsage"        -Title "Average Memory Usage"
                 New-UDTableColumn -Property "AverageCPUUsageMHz" -Title "Average CPU Usage (MHz)"
                 New-UDTableColumn -Property "IPAddress"          -Title "IP Address"
+
+                # Power toggle (Start/Stop) with feedback and refresh
                 New-UDTableColumn -Property "Power"              -Title "Toggle Power" -Render {
                     New-UDIconButton -Icon (New-UDIcon -Icon "PowerOff") -OnClick {
                         if ((Get-VM -Name $EventData.Name).State -eq 'Running') {
@@ -508,6 +545,7 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                     }
                 }
 
+                # Restart VM when running
                 New-UDTableColumn -Property "Restart"              -Title "Restart" -Render {
                     New-UDIconButton -Icon (New-UDIcon -Icon "Sync") -OnClick {
                         if ((Get-VM -Name $EventData.Name).State -eq 'Running') {
@@ -520,6 +558,8 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         Sync-UDElement -Id "vmTable"
                     }
                 }
+
+                # Edit modal for name and startup memory
                 New-UDTableColumn -Property "Edit"              -Title "Edit" -Render {
                     New-UDIconButton -Icon (New-UDIcon -Icon "Wrench") -OnClick {
                         $currentVM = Get-VM -Name $EventData.Name
@@ -553,13 +593,8 @@ $HomePage = New-UDPage -Name 'Home' -Url '/' -Content {
                         } -Footer {
                             New-UDButton -Text "Close" -OnClick { Hide-UDModal }
                         }
-
-
                     }
                 }
-                
-
-
                 New-UDTableColumn -Property "Monitoring"              -Title "Monitoring Data" -Render {
                     New-UDButton -Icon(New-UDIcon -Icon "Heartbeat") -OnClick {
                         $vmName = $EventData.Name

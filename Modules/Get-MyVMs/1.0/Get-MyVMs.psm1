@@ -4,19 +4,24 @@ DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling
 
 #>
 
+# Helper: returns VMs with computed/readable properties (optionally filter by exact name)
 function Get-MyVMs {
     param(
         [string]$Name
     )
 
+    # Base VM list
     $vms = Get-VM
 
+    # Optional exact-name filter
     if ($Name) {
         $vms = $vms | Where-Object { $_.Name -eq $Name }
     }
 
+    # Project a view with derived fields
     $vms |
     Select-Object -Property Name, State, @{
+        # Parsed uptime
         Name       = 'Uptime'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -28,6 +33,7 @@ function Get-MyVMs {
             }
         }
     }, @{
+        # Memory demand vs assigned
         Name       = 'MemoryUsage'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -40,6 +46,7 @@ function Get-MyVMs {
             }
         }
     }, @{
+        # Assigned memory in MB
         Name       = 'MemoryAssigned'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -51,6 +58,7 @@ function Get-MyVMs {
         }
     },
     @{
+        # Used memory in MB based on demand
         Name       = 'MemoryUsed'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -62,6 +70,7 @@ function Get-MyVMs {
         }
     },
     @{
+        # Average CPU usage in MHz 
         Name       = 'AverageCPUUsageMHz'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -73,6 +82,7 @@ function Get-MyVMs {
             }
         }
     }, @{
+        # CPU usage in percentage
         Name       = 'CPUUsage(%)'
         Expression = {
             if ($_.State -eq 'Running') {
@@ -84,6 +94,7 @@ function Get-MyVMs {
         }
     },
     @{
+        # Extract IP addresses
         Name       = 'IPAddress'
         Expression = {
             if ($_.State -eq 'Running') {

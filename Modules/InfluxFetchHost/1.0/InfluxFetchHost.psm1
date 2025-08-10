@@ -4,8 +4,10 @@ DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling
 
 #>
 
+# Query InfluxDB for host metrics and return CSV
 function InfluxFetchHost {
     param (
+        # Flux query: last hour of CPU and Memory data
         [string]$Query = @"
 from(bucket: "Hyper_V")
   |> range(start: -1h)
@@ -14,6 +16,7 @@ from(bucket: "Hyper_V")
   |> sort(columns: ["_time"], desc: true)
   |> limit(n: 100)
 "@,
+        # Influx connection info
         [string]$Bucket = $Secret:influxBucket,
         [string]$Org = $Secret:influxOrg,
         [string]$Server = $Secret:influxServer,
@@ -22,6 +25,7 @@ from(bucket: "Hyper_V")
 
     $url = "$Server/api/v2/query?org=$Org"
 
+    # Send Influx body and headers to Influx
     $body = @{
         query = $Query
     } | ConvertTo-Json
@@ -39,7 +43,4 @@ from(bucket: "Hyper_V")
     catch {
         Write-Error "Failed to query InfluxDB: $_"
     }
-
-
-    
 }
