@@ -73,3 +73,10 @@ The admin console can be reached on port 5000 of the server running PSU. The das
 ### Influxdb
 
 Influxdb can be accessed on port 8086: http://localhost:8086
+
+## Pester Tests
+
+There are two Pester test files to test the included custom modules (Get-MyVMs and InfluxFetch). They are located in the Scripts\Tests folder and can be run through the following commands:
+
+- Invoke-pester -Path C:\ProgramData\UniversalAutomation\Repository\Scripts\Tests\Get-MyVMs.Tests.ps1 -Output Detailed
+- Invoke-pester -Path C:\ProgramData\UniversalAutomation\Repository\Scripts\Tests\InfluxFetch.Tests.ps1 -Output Detailed
