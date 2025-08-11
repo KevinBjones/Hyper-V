@@ -4,8 +4,8 @@ DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling
 
 #>
 BeforeAll {
- 
-    Import-Module Get-MyVMs
+    Remove-Module Get-MyVMs
+    Import-Module "C:\ProgramData\UniversalAutomation\Repository\Modules\Get-MyVMs\1.0\Get-MyVMs.psm1"
     
     Mock Get-VM
     Mock Get-VMNetworkAdapter
