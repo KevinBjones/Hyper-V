@@ -1,3 +1,9 @@
+<#
+
+DISCLAIMER: ChatGPT is gebruikt voor troubleshooting van logica, foutafhandeling, parsing en algemene coding sparring partner. 
+
+#>
+
 BeforeAll {
  
     Import-Module "C:\ProgramData\UniversalAutomation\Repository\Modules\InfluxFetchHost\1.0\InfluxFetchHost.psm1" -Force

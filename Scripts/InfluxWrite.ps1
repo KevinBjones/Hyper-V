@@ -22,34 +22,25 @@ function Get-SystemMetrics {
     }
 }
 
-# Collect CPU% and Memory Used (MB) via Get-MyVMs
+# Collect CPU% and Memory Used (MB) via Get-MyVMs and create consistency in fields (value returns null if the value is N/A)
 function Get-VMSystemMetrics {
-    $vmMetricsList = @()
-
-    $vms = Get-MyVMs
-
-    foreach ($vm in $vms) {
-
-        # Default numeric initialization
-        [double]$cpuUsage = 0
-        [double]$memoryUsed = 0
-        
-        # Pull numeric CPU% and memory used (MB)
-        $cpuUsage = [math]::Round([double]$vm.'CPUUsage(%)', 2)
-        $memoryUsed = [math]::Round([double]$vm.MemoryUsed, 2)
    
-        # Shape to hashtable per VM
-        $metrics = @{
+    $vmMetricsList = @()
+    foreach ($vm in Get-MyVMs) {
+        $cpuRaw = $vm.'CPUUsage(%)' -as [double]
+        $memRaw = $vm.MemoryUsed -as [double]
+
+        # Build an ordered record for input in InfluxDB
+        $vmMetricsList += [ordered]@{
             VM_Name        = $vm.Name
-            CPU_Usage      = $cpuUsage
-            Memory_Used_MB = $memoryUsed
+            IsRunning      = ($vm.State -eq 'Running')   
+            CPU_Usage      = if ($cpuRaw -ne $null) { [math]::Round($cpuRaw, 2) } else { 0 }
+            Memory_Used_MB = if ($memRaw -ne $null) { [math]::Round($memRaw, 2) } else { 0 }
         }
-
-        $vmMetricsList += $metrics
     }
-
-    return $vmMetricsList
+    $vmMetricsList
 }
+
 
 # Influx write wrapper 
 function Write-MetricsToInflux {
